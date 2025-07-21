@@ -1,0 +1,15 @@
+{
+  "name": "test-stand-ui",
+  "version": "1.0.0",
+  "description": "UI for test stand",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^37.2.3"
+  }
+}
