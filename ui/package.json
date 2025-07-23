@@ -1,15 +1,16 @@
 {
-  "name": "test-stand-ui",
+  "name": "ui-test-stand",
   "version": "1.0.0",
-  "description": "UI for test stand",
-  "main": "main.js",
+  "main": "./out/main/index.js",
   "scripts": {
-    "start": "electron .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "electron-vite preview",
+    "dev": "electron-vite dev",
+    "prebuild": "electron-vite build"
   },
   "author": "",
   "license": "ISC",
+  "description": "",
   "devDependencies": {
-    "electron": "^37.2.3"
+    "electron-vite": "^3.1.0"
   }
 }
