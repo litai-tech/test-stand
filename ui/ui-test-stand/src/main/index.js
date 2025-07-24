@@ -3,6 +3,12 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 const { SerialPort } = require('serialport');
+const { ReadlineParser } = require('@serialport/parser-readline');
+const fs = require('fs');
+
+let port = null;
+let parser = null;
+let webContents = null;
 
 function createWindow() {
   // Create the browser window.
@@ -14,7 +20,9 @@ function createWindow() {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false, // Do NOT use nodeIntegration!
     }
   })
 
@@ -53,6 +61,14 @@ app.whenReady().then(() => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
+  ipcMain.on('append-line', (event, filePath, line) => {
+    fs.appendFile(filePath, line + '\n', (err) => {
+      if (err) {
+        console.error('Failed to write line to file:', err);
+      }
+    });
+  });
+
   // Handle serial port list
   ipcMain.handle('serial:list', async () => {
     return await SerialPort.list();
@@ -60,10 +76,35 @@ app.whenReady().then(() => {
 
   // Handle serial port open/write
   ipcMain.handle('serial:open', async (_event, path, baudRate) => {
-    const port = new SerialPort({ path, baudRate });
+    if (port && port.isOpen) port.close();
+
     return new Promise((resolve, reject) => {
-      port.on('open', () => resolve('Opened'));
-      port.on('error', (err) => reject(err.message));
+      port = new SerialPort({ path, baudRate }, (err) => {
+        if (err) {
+          reject(err.message);
+        } else {
+          // Optional parser to get lines
+          parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
+
+          parser.on('data', (data) => {
+            if (webContents) {
+              webContents.send('serial:data', data); // emit to renderer
+            }
+          });
+
+          resolve('Port opened');
+        }
+      });
+    });
+  });
+
+  ipcMain.handle('serial:write', async (_event, data) => {
+    return new Promise((resolve, reject) => {
+      if (!port || !port.isOpen) return reject('Port is not open');
+      port.write(data, (err) => {
+        if (err) reject(err.message);
+        else resolve('Data written');
+      });
     });
   });
 

@@ -1,7 +1,7 @@
 <template>
   <div class="container">
     <div class="row">
-      <Line :data="chartData" :options="options" />
+      <Line ref="chartWrapper" :data="chartData" :options="options" />
     </div>
     <div class="row mt-4">
       <div class="col-2">
@@ -23,14 +23,16 @@
       <div class="col-5">
         <div class="input-group">
           <span class="input-group-text" id="basic-addon3">Bang duration (ms)</span>
-          <input v-model="bangDuration" type="number" class="form-control" id="basic-url" aria-describedby="basic-addon3">
+          <input v-model="bangDuration" type="number" class="form-control" id="basic-url"
+            aria-describedby="basic-addon3">
         </div>
       </div>
       <div class="col-2 d-grid">
         <button type="button" class="btn btn-outline-success" @click="sendBangCommand">Bang</button>
       </div>
       <div class="col-2 d-grid">
-        <button type="button" class="btn btn-outline-primary" @mousedown="onHoldPress" @mouseup="onHoldRelease">Hold</button>
+        <button type="button" class="btn btn-outline-primary" @mousedown="onHoldPress"
+          @mouseup="onHoldRelease">Hold</button>
       </div>
     </div>
     <div class="row mt-4">
@@ -42,11 +44,25 @@
     <div class="row mt-2">
       <span>Bang duration (ms): {{ bangDuration }}</span>
     </div>
+    <div class="row mt-2">
+      <div class="form-check form-switch ml-2">
+        <label class="form-check-label" for="writeToLogsCheck">
+          Write to logs
+        </label>
+        <input class="form-check-input" type="checkbox" v-model="writeToLogs" id="writeToLogsCheck">
+      </div>
+    </div>
+    <div class="row mt-2">
+      <div class="input-group">
+        <span class="input-group-text" id="file-path">Logs file path</span>
+        <input v-model="logFilePath" type="text" class="form-control" id="file-path-id" aria-describedby="file-path">
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, useTemplateRef, computed } from 'vue'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, Title, Tooltip, Legend, PointElement, LineElement, CategoryScale, LinearScale } from 'chart.js'
 
@@ -58,8 +74,13 @@ ChartJS.register(CategoryScale,
   Tooltip,
   Legend);
 
-const chartData = ref({
-  labels: ['January', 'February', 'March', 'a', 'b', 'c'],
+const chartWrapper = ref(null)
+
+let datasetData = [];
+let dataLabels = [];
+
+const chartData = {
+  labels: [],
   datasets: [
     {
       label: 'Weight Sensor Data',
@@ -67,37 +88,97 @@ const chartData = ref({
       borderColor: "#1E90FF",
       tension: 0.5,
       pointRadius: 0,
-      data: [40, 20, 12, 20, 45, 30]
+      data: []
     }
   ]
-});
+};
 
-const options = ref({});
+const maxDataPoints = 30;
+
+const options = ref({
+  animation: {
+    duration: 0
+  }
+});
 const serialPorts = ref([]);
 const selectedSerialPort = ref('');
 
 const bangDuration = ref(50);
 
+const writeToLogs = ref(false)
+const logFilePath = ref('/Users/andrewsnigur/Downloads/test_stand_log_' + new Date().toISOString() + '.txt');
+
 async function updateSerialPorts() {
-  const ports = await window.electron.ipcRenderer.invoke('serial:list');
+  const ports = await window.serialAPI.list();
   serialPorts.value = ports.map((p) => p.path);
 };
 
-function selectSerialPort(port) {
+async function selectSerialPort(port) {
   selectedSerialPort.value = port;
+
+  const result = await window.serialAPI.open(port, 115200);
+  console.log(result);
 }
 
-function sendBangCommand() {
+const sendData = async (data) => {
+  try {
+    await window.serialAPI.write(data);
+  } catch (err) {
+    console.error('Write failed:', err);
+  }
+};
+
+let counter = 1;
+async function sendBangCommand() {
+  writeToLogs.value = true;
+  let cmd = 'b ' + bangDuration.value;
+  appendChartData('' + counter + ' ' + Math.random())
+  counter++
+  //appendToFile(cmd)
+
+  //await sendData(cmd)
   console.log(bangDuration.value)
 }
 
-function onHoldPress() {
+async function onHoldPress() {
+  writeToLogs.value = true;
+  await sendData('start')
   console.log('Button pressed');
-  // Set state, trigger logic, etc.
 }
 
-function onHoldRelease() {
+async function onHoldRelease() {
+  writeToLogs.value = true;
+  await sendData('stop')
   console.log('Button released');
-  // Reset state, etc.
 }
+
+const appendToFile = (data) => {
+  window.fileAPI.appendLine(logFilePath.value, data);
+};
+
+window.serialAPI.onData((data) => {
+  if (writeToLogs.value)
+    appendToFile(data)
+
+  messages.value.push(data.trim());
+});
+
+function appendChartData(data) {
+  appendToFile(data)
+  let splited = data.split(' ')
+
+  let chart = chartWrapper.value.chart;
+
+  dataLabels.push(splited[0])
+  datasetData.push(splited[1])
+  if (datasetData.length > maxDataPoints) {
+    dataLabels.shift();
+    datasetData.shift();
+  }
+
+  chart.data.labels = dataLabels;
+  chart.data.datasets[0].data = datasetData;
+  chart.update()
+}
+
 </script>
