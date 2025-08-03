@@ -26,6 +26,8 @@ function createWindow() {
     }
   })
 
+  webContents = mainWindow.webContents;
+
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
@@ -87,6 +89,7 @@ app.whenReady().then(() => {
           parser = port.pipe(new ReadlineParser({ delimiter: '\n' }));
 
           parser.on('data', (data) => {
+            //console.log(data)
             if (webContents) {
               webContents.send('serial:data', data); // emit to renderer
             }

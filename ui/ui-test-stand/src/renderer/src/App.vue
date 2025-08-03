@@ -93,7 +93,7 @@ const chartData = {
   ]
 };
 
-const maxDataPoints = 30;
+const maxDataPoints = 250;
 
 const options = ref({
   animation: {
@@ -116,13 +116,14 @@ async function updateSerialPorts() {
 async function selectSerialPort(port) {
   selectedSerialPort.value = port;
 
-  const result = await window.serialAPI.open(port, 115200);
+  const result = await window.serialAPI.open(port, 9600);
   console.log(result);
 }
 
 const sendData = async (data) => {
   try {
     await window.serialAPI.write(data);
+    appendToFile(cmd)
   } catch (err) {
     console.error('Write failed:', err);
   }
@@ -132,11 +133,10 @@ let counter = 1;
 async function sendBangCommand() {
   writeToLogs.value = true;
   let cmd = 'b ' + bangDuration.value;
-  appendChartData('' + counter + ' ' + Math.random())
+  //appendChartData('' + counter + ' ' + Math.random())
   counter++
-  //appendToFile(cmd)
 
-  //await sendData(cmd)
+  await sendData(cmd)
   console.log(bangDuration.value)
 }
 
@@ -157,16 +157,17 @@ const appendToFile = (data) => {
 };
 
 window.serialAPI.onData((data) => {
+  //console.log(writeToLogs.value)
   if (writeToLogs.value)
     appendToFile(data)
 
-  messages.value.push(data.trim());
+    appendChartData(data);
+  //messages.value.push(data.trim());
 });
 
 function appendChartData(data) {
-  appendToFile(data)
+  //appendToFile(data)
   let splited = data.split(' ')
-
   let chart = chartWrapper.value.chart;
 
   dataLabels.push(splited[0])
